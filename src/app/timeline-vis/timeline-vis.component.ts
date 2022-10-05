@@ -2,6 +2,11 @@ import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { Timeline } from 'vis-timeline';
 import { DataSet } from 'vis-data';
 
+enum BtnOpacity {
+    Active = 0.5,
+    Disable = 0.15,
+}
+
 @Component({
     selector: 'app-timeline-vis',
     templateUrl: './timeline-vis.component.html',
@@ -10,12 +15,20 @@ import { DataSet } from 'vis-data';
 export class TimelineVisComponent implements OnInit {
     @ViewChild('timeline', { static: true }) timelineContainer = new ElementRef(null);
     @ViewChild('rangeScreen', { static: true }) rangeScreen = new ElementRef(null);
+    //Inputs
+
     timeline: Timeline | null = null;
+    maxZoom = 7952400000;
+    minZoom = 1000000;
     options = {};
     data: any;
     groups: any = null;
     currentRange: { start: any; end: any } | null = null;
     selectableMode = false;
+    toolbarOptions = {
+        zoomInOpacity: BtnOpacity.Active,
+        zoomOutOpacity: BtnOpacity.Active,
+    };
 
     constructor() {
         this.getTimelineData();
@@ -40,11 +53,30 @@ export class TimelineVisComponent implements OnInit {
                 console.log(this.currentRange);
             }
         });
+        this.timeline.on('rangechanged', (s) => {
+            let timelineW = this.timeline?.getWindow();
+            if (timelineW) {
+                //@ts-ignore
+                let diff = timelineW.end - timelineW.start;
+                diff <= this.minZoom ? (this.toolbarOptions.zoomInOpacity = BtnOpacity.Disable) : null;
+                diff > this.minZoom ? (this.toolbarOptions.zoomInOpacity = BtnOpacity.Active) : null;
+                diff >= this.maxZoom ? (this.toolbarOptions.zoomOutOpacity = BtnOpacity.Disable) : null;
+                diff < this.maxZoom ? (this.toolbarOptions.zoomOutOpacity = BtnOpacity.Active) : null;
+            }
+        });
     }
 
     selectRange() {
         this.timeline?.setOptions({ moveable: false });
         this.selectableMode = true;
+    }
+
+    onZoomIn() {
+        this.timeline?.zoomIn(1, { animation: true });
+    }
+
+    onZoomOut() {
+        this.timeline?.zoomOut(1, { animation: true });
     }
 
     mouseDownHandle(props: object) {
@@ -69,8 +101,6 @@ export class TimelineVisComponent implements OnInit {
     }
 
     getTimelineData() {
-        // Create a DataSet (allows two way data-binding)
-        // create items
         let getRandom = (min: number, max: number) => {
             return Math.random() * (max - min) + min;
         };
@@ -104,7 +134,16 @@ export class TimelineVisComponent implements OnInit {
             content: ' ',
             className: 'bookmark',
         });
-        console.log(dataList);
+        dataList.push({
+            id: maxPoints + 3,
+            // group: 1,
+            start: new Date(2022, 9, 4, 11, 0, 0),
+            end: new Date(2022, 9, 4, 20, 0, 0),
+            content: ' ',
+            className: 'range',
+            editable: true,
+        });
+
         this.data = new DataSet(dataList);
         // this.data = new DataSet([
         //     {
@@ -181,35 +220,35 @@ export class TimelineVisComponent implements OnInit {
         //         content: ' ',
         //         className: 'bookmark',
         //     },
-        //     // {
-        //     //     id: 4,
-        //     //     group: 3,
-        //     //     start: new Date(2022, 9, 4, 11, 0, 0),
-        //     //     end: new Date(2022, 9, 4, 20, 0, 0),
-        //     //     content: ' ',
-        //     //     className: 'range',
-        //     // },
+
         // ]);
     }
 
     getOptions() {
         this.options = {
             stack: false,
-            start: new Date(),
-            end: new Date(1000 * 60 * 60 * 24 + new Date().valueOf()),
+            start: new Date(2022, 9, 4),
+            end: new Date(2022, 9, 5),
             margin: {
                 item: 5, // minimal margin between items
                 axis: 2, // minimal margin between items and the axis
             },
             orientation: 'bottom',
             selectable: true,
-            showCurrentTime: false,
+            showCurrentTime: true,
             zoomFriction: 1,
             // height: '100px',
-            zoomMin: 1000000,
+            zoomMin: this.minZoom,
+            zoomMax: this.maxZoom,
             minHeight: '10px',
+            // timeAxis: { scale: 'weekday', step: 3 },
+            showWeekScale: true,
             // min: new Date(),
             // ma
+            // format: {
+            //     minorLabels: (date: Date, scale: Number, step: Number) => {},
+            //     majorLabels: (date: Date, scale: Number, step: Number) => {},
+            // },
         };
     }
 }

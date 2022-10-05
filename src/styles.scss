@@ -14,6 +14,13 @@
     border: none;
 }
 
+.vis-current-time {
+    background-color: #211a1a;
+    width: 1px;
+    z-index: 1;
+    pointer-events: none;
+}
+
 .vis-item.my-dot {
     border-radius: 0 !important;
 }

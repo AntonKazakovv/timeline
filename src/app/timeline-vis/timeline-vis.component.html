@@ -1,5 +1,21 @@
 <div>
     <div #timeline></div>
     <button (click)="selectRange()">Select range</button>
+    <div class="toolbar">
+        <button (click)="onZoomIn()"><ng-container *ngTemplateOutlet="zoomIn"></ng-container></button>
+        <button (click)="onZoomOut()"><ng-container *ngTemplateOutlet="zoomOut"></ng-container></button>
+    </div>
 </div>
 <ng-template #rangeScreen>TEST</ng-template>
+
+<ng-template #zoomIn>
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M7.96075 0.25C12.0948 0.25 15.4608 3.616 15.4608 7.75C15.4608 9.54625 14.8307 11.1925 13.7733 12.4847L19.75 18.46L18.6708 19.54L12.6948 13.5632C11.3601 14.6575 9.6866 15.2537 7.96075 15.25C3.82675 15.25 0.460751 11.884 0.460751 7.75C0.460751 3.616 3.82675 0.25 7.96075 0.25ZM7.96075 1.75C4.63825 1.75 1.96075 4.4275 1.96075 7.75C1.96075 11.0725 4.63825 13.75 7.96075 13.75C11.2832 13.75 13.9608 11.0725 13.9608 7.75C13.9608 4.4275 11.2832 1.75 7.96075 1.75ZM8.71075 4.75V7H10.9608V8.5H8.71075V10.75H7.21075V8.5H4.96075V7H7.21075V4.75H8.71075Z" fill="#001F3D" [attr.fill-opacity]="toolbarOptions.zoomInOpacity"/>
+    </svg>
+</ng-template>
+
+<ng-template #zoomOut>
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M7.96075 0.25C12.0948 0.25 15.4608 3.616 15.4608 7.75C15.4608 9.54625 14.8307 11.1925 13.7733 12.4847L19.75 18.46L18.6708 19.54L12.6948 13.5632C11.3601 14.6575 9.6866 15.2537 7.96075 15.25C3.82675 15.25 0.460751 11.884 0.460751 7.75C0.460751 3.616 3.82675 0.25 7.96075 0.25ZM7.96075 1.75C4.63825 1.75 1.96075 4.4275 1.96075 7.75C1.96075 11.0725 4.63825 13.75 7.96075 13.75C11.2832 13.75 13.9608 11.0725 13.9608 7.75C13.9608 4.4275 11.2832 1.75 7.96075 1.75ZM10.9608 7V8.5H4.96075V7H10.9608Z" fill="#001F3D" [attr.fill-opacity]="toolbarOptions.zoomOutOpacity"/>
+    </svg>
+</ng-template>
