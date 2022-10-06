@@ -1,5 +1,5 @@
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
-import { Timeline } from 'vis-timeline';
+import { Timeline, TimelineItem } from 'vis-timeline';
 import { DataSet } from 'vis-data';
 
 enum BtnOpacity {
@@ -22,6 +22,10 @@ export class TimelineVisComponent implements OnInit {
     minZoom = 1000000;
     options = {};
     data: any;
+    itemsList: TimelineItem[] = [];
+    rangeId: number | null = null;
+    startRangeId: number | null = null;
+    endRangeId: number | null = null;
     groups: any = null;
     currentRange: { start: any; end: any } | null = null;
     selectableMode = false;
@@ -38,9 +42,8 @@ export class TimelineVisComponent implements OnInit {
 
     ngOnInit() {
         //@ts-ignore
-        this.timeline = new Timeline(this.timelineContainer.nativeElement!, null, this.options);
+        this.timeline = new Timeline(this.timelineContainer.nativeElement!, this.data, this.options);
         this.timeline.setGroups(this.groups);
-        this.timeline.setItems(this.data);
         this.timeline.on('mouseDown', (props) => {
             if (this.selectableMode) {
                 this.currentRange = { start: props, end: null };
@@ -51,7 +54,9 @@ export class TimelineVisComponent implements OnInit {
                 this.currentRange!.end = props;
                 this.timeline?.setOptions({ moveable: true });
                 console.log(this.currentRange);
+                this.createRangeItem(this.currentRange?.start.time, this.currentRange?.end.time);
             }
+            this.selectableMode = false;
         });
         this.timeline.on('rangechanged', (s) => {
             let timelineW = this.timeline?.getWindow();
@@ -64,6 +69,52 @@ export class TimelineVisComponent implements OnInit {
                 diff < this.maxZoom ? (this.toolbarOptions.zoomOutOpacity = BtnOpacity.Active) : null;
             }
         });
+    }
+    createRangeItem(start: Date, end: Date) {
+        let group = [];
+        // this.startRangeId = maxPoints + 4;
+        this.data.add([
+            {
+                id: 1,
+                group: 1,
+                type: 'box',
+                start: start,
+                content: ' ',
+                editable: {
+                    remove: false,
+                    updateGroup: false,
+                    updateTime: true,
+                },
+                className: 'left-point-range',
+            },
+            {
+                id: 2,
+                group: 1,
+                type: 'box',
+                start: end,
+                content: ' ',
+                editable: {
+                    remove: false,
+                    updateGroup: false,
+                    updateTime: true,
+                },
+                className: 'left-point-range',
+            },
+            {
+                id: 3,
+                // group: 1,
+                type: 'background',
+                start: start,
+                end: end,
+                content: ' ',
+                editable: true,
+            },
+        ]);
+
+        this.startRangeId = 1;
+        this.endRangeId = 2;
+        this.rangeId = 3;
+        // this.timeline?.setItems(this.itemsList);
     }
 
     selectRange() {
@@ -107,12 +158,13 @@ export class TimelineVisComponent implements OnInit {
 
         let dataList: object[] = [];
         let maxPoints = 50;
-        for (let id = 1; id < maxPoints; id++) {
+        for (let id = 4; id < maxPoints; id++) {
             let group = Math.floor(getRandom(1, 6));
             dataList.push({
                 id: id,
                 type: 'point',
                 group: group,
+                selectable: false,
                 start: new Date(2022, 9, 4, getRandom(1, 22), getRandom(1, 60), 0),
                 content: ' ',
                 className: `my-dot item-${group}`,
@@ -144,84 +196,8 @@ export class TimelineVisComponent implements OnInit {
             editable: true,
         });
 
+        this.itemsList = dataList as TimelineItem[];
         this.data = new DataSet(dataList);
-        // this.data = new DataSet([
-        //     {
-        //         id: 1,
-        //         type: 'point',
-        //         group: 1,
-        //         start: new Date(2022, 9, 4, 10, 50, 0),
-        //         // end: new Date(2022, 9, 1, 11, 51, 0),
-        //         content: ' ',
-        //         className: 'my-dot item-1',
-        //         style: 'border-color: red',
-        //     },
-        //     {
-        //         id: 2,
-        //         type: 'point',
-        //         group: 2,
-        //         start: new Date(2022, 9, 4, 11, 0, 0),
-        //         content: ' ',
-        //         className: 'my-dot item-2',
-        //     },
-        //     {
-        //         id: 3,
-        //         type: 'point',
-        //         group: 3,
-        //         start: new Date(2022, 9, 4, 11, 0, 0),
-        //         content: ' ',
-        //         className: 'my-dot item-3',
-        //     },
-        //     {
-        //         id: 4,
-        //         type: 'point',
-        //         group: 4,
-        //         start: new Date(2022, 9, 4, 11, 0, 0),
-        //         content: ' ',
-        //         className: 'my-dot item-4',
-        //     },
-        //     {
-        //         id: 8,
-        //         type: 'point',
-        //         group: 5,
-        //         start: new Date(2022, 9, 4, 11, 1, 0),
-        //         content: ' ',
-        //         className: 'my-dot item-5',
-        //     },
-        //     {
-        //         id: 9,
-        //         type: 'point',
-        //         group: 5,
-        //         start: new Date(2022, 9, 4, 11, 1, 0),
-        //         content: ' ',
-        //         className: 'my-dot item-5',
-        //     },
-        //     {
-        //         id: 5,
-        //         type: 'point',
-        //         group: 5,
-        //         start: new Date(2022, 9, 4, 11, 0, 0),
-        //         content: ' ',
-        //         className: 'my-dot item-5',
-        //     },
-        //     {
-        //         id: 6,
-        //         type: 'point',
-        //         group: 6,
-        //         start: new Date(2022, 9, 4, 11, 0, 0),
-        //         content: ' ',
-        //         className: 'bookmark',
-        //     },
-        //     {
-        //         id: 7,
-        //         type: 'point',
-        //         group: 6,
-        //         start: new Date(2022, 9, 4, 15, 0, 0),
-        //         content: ' ',
-        //         className: 'bookmark',
-        //     },
-
-        // ]);
     }
 
     getOptions() {
@@ -233,22 +209,26 @@ export class TimelineVisComponent implements OnInit {
                 item: 5, // minimal margin between items
                 axis: 2, // minimal margin between items and the axis
             },
+            locale: 'en',
             orientation: 'bottom',
             selectable: true,
             showCurrentTime: true,
             zoomFriction: 1,
-            // height: '100px',
             zoomMin: this.minZoom,
             zoomMax: this.maxZoom,
             minHeight: '10px',
-            // timeAxis: { scale: 'weekday', step: 3 },
             showWeekScale: true,
-            // min: new Date(),
-            // ma
-            // format: {
-            //     minorLabels: (date: Date, scale: Number, step: Number) => {},
-            //     majorLabels: (date: Date, scale: Number, step: Number) => {},
-            // },
+            onMoving: (elem: any, callback: Function) => {
+                if (elem.id === this.startRangeId || elem.id === this.endRangeId) {
+                    console.log(this.data.getIds());
+                    if (elem.id === this.startRangeId) {
+                        this.data.update({ id: this.rangeId, start: elem.start });
+                    } else if (elem.id === this.endRangeId) {
+                        this.data.update({ id: this.rangeId, end: elem.start });
+                    }
+                    this.data.update({ id: elem.id, start: elem.start });
+                }
+            },
         };
     }
 }
