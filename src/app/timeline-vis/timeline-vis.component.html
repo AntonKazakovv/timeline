@@ -4,6 +4,8 @@
     <div class="toolbar">
         <button (click)="onZoomIn()"><ng-container *ngTemplateOutlet="zoomIn"></ng-container></button>
         <button (click)="onZoomOut()"><ng-container *ngTemplateOutlet="zoomOut"></ng-container></button>
+        <button (click)="goToDate(lastItemDate!)">Go to</button>
+
     </div>
 </div>
 <ng-template #rangeScreen>TEST</ng-template>

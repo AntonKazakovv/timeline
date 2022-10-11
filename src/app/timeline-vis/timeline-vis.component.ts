@@ -1,10 +1,33 @@
-import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { Timeline, TimelineItem } from 'vis-timeline';
 import { DataSet } from 'vis-data';
+import { logsJson } from './logs';
+import { BehaviorSubject, Subject, takeUntil } from 'rxjs';
 
 enum BtnOpacity {
     Active = 0.5,
     Disable = 0.15,
+}
+
+enum RangeIds {
+    leftEdge = 1,
+    rightEdge = 2,
+    firstBackground = 3,
+    secondBackground = 4,
+}
+
+interface LogItem {
+    app: string;
+    branch: string;
+    component: string;
+    data: object;
+    id: number;
+    level: string;
+    message: string;
+    msg_count: number;
+    seq_id: number;
+    timestamp: string;
+    version: string;
 }
 
 @Component({
@@ -12,70 +35,146 @@ enum BtnOpacity {
     templateUrl: './timeline-vis.component.html',
     styleUrls: ['./timeline-vis.component.scss'],
 })
-export class TimelineVisComponent implements OnInit {
+export class TimelineVisComponent implements OnInit, OnDestroy {
     @ViewChild('timeline', { static: true }) timelineContainer = new ElementRef(null);
     @ViewChild('rangeScreen', { static: true }) rangeScreen = new ElementRef(null);
-    //Inputs
 
     timeline: Timeline | null = null;
     maxZoom = 7952400000;
     minZoom = 1000000;
     options = {};
-    data: any;
-    itemsList: TimelineItem[] = [];
-    rangeId: number | null = null;
-    startRangeId: number | null = null;
-    endRangeId: number | null = null;
+    data: any = null;
     groups: any = null;
-    currentRange: { start: any; end: any } | null = null;
     selectableMode = false;
+    isMouseDown = false;
+    rangeBackAxis: Date | null = null;
     toolbarOptions = {
         zoomInOpacity: BtnOpacity.Active,
         zoomOutOpacity: BtnOpacity.Active,
     };
+    logLevelToGroup = {
+        info: 1,
+        warning: 2,
+        error: 3,
+    };
+    lastItemDate: Date | null = null;
 
-    constructor() {
-        this.getTimelineData();
-        this.getTimelineGroups();
-        this.getOptions();
-    }
+    destroy$ = new Subject();
+    bookmarks$ = new BehaviorSubject<number[]>([]);
 
     ngOnInit() {
+        this.getTimelineGroups();
+        this.getOptions();
+        this.logsToTimelineItems(logsJson);
+        this.initTimeline();
+
+        this.createBookmarks();
+        this.bookmarks$.next([683678959, 683678957, 683678948]);
+    }
+
+    ngOnDestroy() {
+        this.destroy$.next(null);
+        this.bookmarks$.complete();
+    }
+
+    initTimeline(): void {
         //@ts-ignore
         this.timeline = new Timeline(this.timelineContainer.nativeElement!, this.data, this.options);
         this.timeline.setGroups(this.groups);
         this.timeline.on('mouseDown', (props) => {
             if (this.selectableMode) {
-                this.currentRange = { start: props, end: null };
+                this.removeRange();
+
+                this.isMouseDown = true;
+
+                this.data.add([
+                    {
+                        id: RangeIds.firstBackground,
+                        type: 'background',
+                        start: props.time,
+                        end: props.time,
+                        content: ' ',
+                    },
+                ]);
+                this.rangeBackAxis = props.time;
+            }
+        });
+        this.timeline.on('mouseMove', (props) => {
+            if (this.selectableMode && this.isMouseDown) {
+                if (props.time < this.rangeBackAxis!) {
+                    this.data.update({ id: RangeIds.firstBackground, start: props.time, end: this.rangeBackAxis });
+                } else {
+                    this.data.update({ id: RangeIds.firstBackground, end: props.time, start: this.rangeBackAxis });
+                }
             }
         });
         this.timeline.on('mouseUp', (props) => {
             if (this.selectableMode) {
-                this.currentRange!.end = props;
                 this.timeline?.setOptions({ moveable: true });
-                console.log(this.currentRange);
-                this.createRangeItem(this.currentRange?.start.time, this.currentRange?.end.time);
+                if (props.time < this.rangeBackAxis!) {
+                    this.createRangeItem(props.time, this.rangeBackAxis!);
+                } else {
+                    this.createRangeItem(this.rangeBackAxis!, props.time);
+                }
+                this.data.remove(RangeIds.firstBackground);
             }
+
+            this.isMouseDown = false;
             this.selectableMode = false;
         });
         this.timeline.on('rangechanged', (s) => {
             let timelineW = this.timeline?.getWindow();
             if (timelineW) {
                 //@ts-ignore
-                let diff = timelineW.end - timelineW.start;
-                diff <= this.minZoom ? (this.toolbarOptions.zoomInOpacity = BtnOpacity.Disable) : null;
-                diff > this.minZoom ? (this.toolbarOptions.zoomInOpacity = BtnOpacity.Active) : null;
-                diff >= this.maxZoom ? (this.toolbarOptions.zoomOutOpacity = BtnOpacity.Disable) : null;
-                diff < this.maxZoom ? (this.toolbarOptions.zoomOutOpacity = BtnOpacity.Active) : null;
+                const diff = timelineW.end - timelineW.start;
+                if (diff <= this.minZoom) this.toolbarOptions.zoomInOpacity = BtnOpacity.Disable;
+                if (diff > this.minZoom) this.toolbarOptions.zoomInOpacity = BtnOpacity.Active;
+                if (diff >= this.maxZoom) this.toolbarOptions.zoomOutOpacity = BtnOpacity.Disable;
+                if (diff < this.maxZoom) this.toolbarOptions.zoomOutOpacity = BtnOpacity.Active;
             }
         });
     }
-    createRangeItem(start: Date, end: Date) {
-        let group = [];
-        // this.startRangeId = maxPoints + 4;
+
+    logsToTimelineItems(logs: LogItem[]): void {
+        const dataList = logs.map((log, ind) => {
+            //@ts-ignore
+            const group = this.logLevelToGroup[log.level];
+            ind === 0 ? (this.lastItemDate = new Date(log.timestamp)) : null;
+            return {
+                id: log.id,
+                type: 'point',
+                group,
+                selectable: false,
+                start: new Date(log.timestamp),
+                content: ' ',
+                className: `my-dot item-${group}`,
+            };
+        });
+        this.data = new DataSet(dataList);
+    }
+
+    createBookmarks(): void {
+        this.bookmarks$
+            .asObservable()
+            .pipe(takeUntil(this.destroy$))
+            .subscribe((bookmarks) => {
+                bookmarks.forEach((itemId, ind) => {
+                    this.data.add({
+                        id: ind + 1000,
+                        type: 'point',
+                        group: 6,
+                        start: this.data.get(itemId).start,
+                        content: ' ',
+                        className: 'bookmark',
+                    });
+                });
+            });
+    }
+
+    createRangeItem(start: Date, end: Date): void {
         this.data.add([
             {
-                id: 1,
+                id: RangeIds.leftEdge,
                 group: 1,
                 type: 'box',
                 start: start,
@@ -88,7 +187,7 @@ export class TimelineVisComponent implements OnInit {
                 className: 'left-point-range',
             },
             {
-                id: 2,
+                id: RangeIds.rightEdge,
                 group: 1,
                 type: 'box',
                 start: end,
@@ -101,8 +200,7 @@ export class TimelineVisComponent implements OnInit {
                 className: 'left-point-range',
             },
             {
-                id: 3,
-                // group: 1,
+                id: RangeIds.secondBackground,
                 type: 'background',
                 start: start,
                 end: end,
@@ -110,36 +208,29 @@ export class TimelineVisComponent implements OnInit {
                 editable: true,
             },
         ]);
-
-        this.startRangeId = 1;
-        this.endRangeId = 2;
-        this.rangeId = 3;
-        // this.timeline?.setItems(this.itemsList);
     }
 
-    selectRange() {
+    removeRange(): void {
+        this.data.remove(RangeIds.leftEdge);
+        this.data.remove(RangeIds.rightEdge);
+        this.data.remove(RangeIds.firstBackground);
+        this.data.remove(RangeIds.secondBackground);
+    }
+
+    selectRange(): void {
         this.timeline?.setOptions({ moveable: false });
         this.selectableMode = true;
     }
 
-    onZoomIn() {
+    onZoomIn(): void {
         this.timeline?.zoomIn(1, { animation: true });
     }
 
-    onZoomOut() {
+    onZoomOut(): void {
         this.timeline?.zoomOut(1, { animation: true });
     }
 
-    mouseDownHandle(props: object) {
-        console.log(1);
-    }
-
-    mouseUpHandle(props: object) {
-        console.log(this.timeline);
-        this.timeline?.setOptions({ moveable: true });
-    }
-
-    getTimelineGroups() {
+    getTimelineGroups(): void {
         // create groups
         this.groups = new DataSet([
             { id: 1, content: ' ', className: 'custom-row', style: 'height:10px' },
@@ -151,81 +242,45 @@ export class TimelineVisComponent implements OnInit {
         ]);
     }
 
-    getTimelineData() {
-        let getRandom = (min: number, max: number) => {
-            return Math.random() * (max - min) + min;
-        };
-
-        let dataList: object[] = [];
-        let maxPoints = 50;
-        for (let id = 4; id < maxPoints; id++) {
-            let group = Math.floor(getRandom(1, 6));
-            dataList.push({
-                id: id,
-                type: 'point',
-                group: group,
-                selectable: false,
-                start: new Date(2022, 9, 4, getRandom(1, 22), getRandom(1, 60), 0),
-                content: ' ',
-                className: `my-dot item-${group}`,
-            });
-        }
-        dataList.push({
-            id: maxPoints + 1,
-            type: 'point',
-            group: 6,
-            start: new Date(2022, 9, 4, 11, 0, 0),
-            content: ' ',
-            className: 'bookmark',
-        });
-        dataList.push({
-            id: maxPoints + 2,
-            type: 'point',
-            group: 6,
-            start: new Date(2022, 9, 4, 15, 0, 0),
-            content: ' ',
-            className: 'bookmark',
-        });
-        dataList.push({
-            id: maxPoints + 3,
-            // group: 1,
-            start: new Date(2022, 9, 4, 11, 0, 0),
-            end: new Date(2022, 9, 4, 20, 0, 0),
-            content: ' ',
-            className: 'range',
-            editable: true,
-        });
-
-        this.itemsList = dataList as TimelineItem[];
-        this.data = new DataSet(dataList);
+    goToDate(dateItem: Date): void {
+        this.timeline?.moveTo(dateItem);
     }
 
-    getOptions() {
+    getOptions(): void {
         this.options = {
             stack: false,
             start: new Date(2022, 9, 4),
             end: new Date(2022, 9, 5),
             margin: {
-                item: 5, // minimal margin between items
-                axis: 2, // minimal margin between items and the axis
+                item: 5,
+                axis: 2,
             },
             locale: 'en',
             orientation: 'bottom',
             selectable: true,
-            showCurrentTime: true,
             zoomFriction: 1,
             zoomMin: this.minZoom,
             zoomMax: this.maxZoom,
             minHeight: '10px',
             showWeekScale: true,
+            showCurrentTime: false,
             onMoving: (elem: any, callback: Function) => {
-                if (elem.id === this.startRangeId || elem.id === this.endRangeId) {
-                    console.log(this.data.getIds());
-                    if (elem.id === this.startRangeId) {
-                        this.data.update({ id: this.rangeId, start: elem.start });
-                    } else if (elem.id === this.endRangeId) {
-                        this.data.update({ id: this.rangeId, end: elem.start });
+                if (elem.id === RangeIds.leftEdge || elem.id === RangeIds.rightEdge) {
+                    if (elem.id === RangeIds.leftEdge) {
+                        this.data.update({
+                            id: RangeIds.secondBackground,
+                            start: elem.start,
+                            end: this.data.get(RangeIds.rightEdge).start,
+                        });
+                        this.rangeBackAxis = elem.start;
+                    } else if (elem.id === RangeIds.rightEdge) {
+                        this.data.update({
+                            id: RangeIds.secondBackground,
+                            start: this.data.get(RangeIds.leftEdge).start,
+                            end: elem.start,
+                        });
                     }
+
                     this.data.update({ id: elem.id, start: elem.start });
                 }
             },
