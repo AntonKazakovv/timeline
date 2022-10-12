@@ -52,6 +52,9 @@ export class TimelineVisComponent implements OnInit, OnDestroy {
         zoomInOpacity: BtnOpacity.Active,
         zoomOutOpacity: BtnOpacity.Active,
     };
+    isEdgeCross = false;
+    counterL = RangeIds.leftEdge;
+    counterR = RangeIds.rightEdge;
     logLevelToGroup = {
         info: 1,
         warning: 2,
@@ -265,18 +268,25 @@ export class TimelineVisComponent implements OnInit, OnDestroy {
             showWeekScale: true,
             showCurrentTime: false,
             onMoving: (elem: any, callback: Function) => {
-                if (elem.id === RangeIds.leftEdge || elem.id === RangeIds.rightEdge) {
-                    if (elem.id === RangeIds.leftEdge) {
+                const leftEdge = this.data.get(this.counterL);
+                const rightEdge = this.data.get(this.counterR);
+                if (elem.id === this.counterL || elem.id === this.counterR) {
+                    this.isEdgeCross = leftEdge.start > rightEdge.start;
+
+                    if (this.isEdgeCross) {
+                        [this.counterL, this.counterR] = [this.counterR, this.counterL];
+                    }
+                    if (elem.id === this.counterL) {
                         this.data.update({
                             id: RangeIds.secondBackground,
                             start: elem.start,
-                            end: this.data.get(RangeIds.rightEdge).start,
+                            end: rightEdge.start,
                         });
-                        this.rangeBackAxis = elem.start;
-                    } else if (elem.id === RangeIds.rightEdge) {
+                        // this.rangeBackAxis = elem.start;
+                    } else if (elem.id === this.counterR) {
                         this.data.update({
                             id: RangeIds.secondBackground,
-                            start: this.data.get(RangeIds.leftEdge).start,
+                            start: leftEdge.start,
                             end: elem.start,
                         });
                     }
