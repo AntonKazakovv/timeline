@@ -187,7 +187,7 @@ export class TimelineVisComponent implements OnInit, OnDestroy {
                     updateGroup: false,
                     updateTime: true,
                 },
-                className: 'left-point-range',
+                className: 'left-point-range z-index-100',
             },
             {
                 id: RangeIds.rightEdge,
@@ -200,7 +200,7 @@ export class TimelineVisComponent implements OnInit, OnDestroy {
                     updateGroup: false,
                     updateTime: true,
                 },
-                className: 'left-point-range',
+                className: 'left-point-range z-index-100',
             },
             {
                 id: RangeIds.secondBackground,
